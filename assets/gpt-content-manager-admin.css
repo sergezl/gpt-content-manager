@@ -1,0 +1,14 @@
+/**
+ * All of the CSS for your admin-specific functionality should be
+ * included in this file.
+ */
+.gcm-meta-boxes__prompt-label{
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+#gpt_content_manager_prompt {
+    width: 100%;
+    resize: vertical;
+    margin-bottom: 10px;
+}
