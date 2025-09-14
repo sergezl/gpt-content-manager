@@ -8,76 +8,118 @@
  * @package GptContentManager
  */
 
-namespace GptContentManager;
 
-use GptContentManager\Admin\AdminAssets;
-use GptContentManager\Admin\MetaBoxes;
-use GptContentManager\Admin\SettingsPage;
-use GptContentManager\Frontend\FrontendAssets;
-use GptContentManager\Settings;
-use GptContentManager\WpIncludes\I18n;
+namespace SZ;
 
+use SZ\Settings;
+
+if (!defined('WPINC') || !defined("ABSPATH")) {
+    die();
+}
 class GptContentManager {
 
-	/**
-	 * @var Settings $settings The settings object for the plugin.
-	 */
-	protected Settings $settings;
+    /** @var self */
+    private static ?self $instance = null;
 
-	/**
-	 * GptContentManager constructor.
-	 *
-	 * Initializes the plugin by setting up hooks and loading necessary assets.
-	 *
-	 * @param Settings $settings The settings object for the plugin.
-	 */
-	public function __construct( Settings $settings ) {
-		$this->settings = $settings;
+    /**
+     * @var bool
+     */
+    private bool $loaded = false;
 
-		$this->set_locale();
-		$this->define_admin_hooks();
-		$this->define_frontend_hooks();
+    /** Forbidding creation via new */
+    private function __construct() {}
+
+    /** Forbidding cloning */
+    private function __clone() {}
+
+    /** Forbidding deserialization */
+    public function __wakeup()
+    {
+        throw new \Exception("Cannot unserialize singleton");
+    }
+
+    /**
+     * Get Singleton instance
+     * @return self
+     */
+    public static function getInstance()
+    {
+        return self::$instance ??= new self(); // PHP 7.4+
+    }
+
+    /**
+     * Load base plugin components
+     */
+    public function load() {
+        if ($this->loaded) {
+            return;
+        }
+        $this->loaded = true;
+
+        $this->hook_init();
+        $this->add_menu();
+
+        Settings::init();
+        MetaBoxes::init();
+    }
+
+    /**
+     * Init hooks
+     */
+    public function hook_init() {
+        add_action( 'admin_enqueue_scripts', [$this, 'enqueue' ] , 20);
+        add_action( 'rest_api_init', [RestController::class, 'register_routes'] );
+    }
+
+    /**
+     * Add enqueue
+     */
+	public function enqueue( $hook ) {
+        if ( in_array( $hook, [ 'post.php', 'post-new.php' ], true ) ) {
+            wp_enqueue_style( 'gcm-styles', GCM_URL . 'assets/css/gpt-content-manager-admin.css' );
+            wp_enqueue_script( 'gcm-scripts', GCM_URL . 'assets/js/gpt-content-manager-admin.js' );
+
+            global $post;
+            wp_localize_script(
+                'gcm-scripts',
+                'gcmData',
+                [
+                    'root'  => esc_url_raw( rest_url() ),
+                    'nonce' => wp_create_nonce( 'wp_rest' ),
+                    'post_id'  => $post->ID ?? 0,
+                ]
+            );
+        }
 	}
 
-	/**
-	 * Set the plugin's locale.
-	 *
-	 * Loads the internationalization files for the plugin.
-	 */
-	protected function set_locale(): void {
-		$pluginI18n = new I18n();
+    /**
+     * Add menus
+     */
+    public function add_menu() {
+        add_action( 'admin_menu', [ $this, 'admin_menu' ] );
+    }
 
-		add_action( 'init', [ $pluginI18n, 'load_plugin_gpt_content_manager' ] );
-	}
+    /**
+     * Add admin menu
+     */
+    public function admin_menu() {
+        if( current_user_can('manage_options' ) ) {
+            add_options_page(
+                'GPT Content Manager',
+                'GPT Content Manager',
+                'manage_options',
+                'gpt_content_manager',
+                [ $this, 'admin_options_page' ]
+            );
+        }
 
-	/**
-	 * Define admin hooks.
-	 *
-	 * Registers and enqueues admin-specific assets and initializes settings page and meta boxes.
-	 */
-	protected function define_admin_hooks(): void {
-		$admin_assets = new AdminAssets( $this->settings );
-		add_action( 'admin_enqueue_scripts', [ $admin_assets, 'enqueue_styles' ] );
-		add_action( 'admin_enqueue_scripts', [ $admin_assets, 'enqueue_scripts' ] );
+    }
 
-		$settings_page = new SettingsPage( $this->settings );
-		add_action( 'admin_menu', [ $settings_page, 'add_settings_page' ] );
-		add_action( 'admin_init', [ $settings_page, 'setup_sections' ] );
-		add_action( 'admin_init', [ $settings_page, 'setup_fields' ] );
-		add_action( 'admin_init', [ $settings_page, 'register_settings' ] );
-
-		$meta_boxes = new MetaBoxes( $this->settings );
-	}
-
-	/**
-	 * Define frontend hooks.
-	 *
-	 * Registers and enqueues frontend-specific assets.
-	 */
-	protected function define_frontend_hooks(): void {
-		$frontend_assets = new FrontendAssets( $this->settings );
-
-		add_action( 'wp_enqueue_scripts', [ $frontend_assets, 'enqueue_styles' ] );
-		add_action( 'wp_enqueue_scripts', [ $frontend_assets, 'enqueue_scripts' ] );
-	}
+    /**
+     * Admin option menu callback
+     */
+    public function admin_options_page() {
+        // Include settings view
+        include_once( GCM_DIR . 'views/admin/gpt-content-manager-admin-display.php' );
+    }
 }

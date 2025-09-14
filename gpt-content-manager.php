@@ -1,14 +1,13 @@
 <?php
 /**
- * @since             1.0.0
- * @package           GptContentManager
+ * @since             1.1.0
  *
  * @wordpress-plugin
  * Plugin Name:       GPT Content Manager
  * Plugin URI:        https://github.com/sergezlobovski/gpt
  * Description:       WordPress Plugin for Managing Website Content with ChatGPT
- * Version:           1.0.0
- * Requires PHP:      8.0
+ * Version:           1.1.0
+ * Requires PHP:      8.2
  * Author:            Serge Zlobovski
  * Author URI:        https://github.com/sergezlobovski
  * License:           MIT
@@ -19,30 +18,28 @@
  * Release Asset:     true
  */
 
-namespace GptContentManager;
 
-use GptContentManager\WpIncludes\Activator;
-use GptContentManager\WpIncludes\Deactivator;
-use GptContentManager\Settings;
-
+use \SZ\GptContentManager;
 
 // If this file is called directly, abort.
-if ( ! defined( 'WPINC' ) ) {
-	die();
+if (!defined('WPINC') || !defined("ABSPATH")) {
+    die();
 }
 
-require_once plugin_dir_path( __FILE__ ) . '/vendor/autoload.php';
+define( 'GCM_DIR', plugin_dir_path( __FILE__ ) );
+// Define plugin base url.
+define( 'GCM_URL', plugin_dir_url( __FILE__ ) );
 
-define( 'GPT_CONTENT_MANAGER_VERSION', '1.0.0' );
-define( 'GPT_CONTENT_MANAGER_BASENAME', plugin_basename( __FILE__ ) );
-define( 'GPT_CONTENT_MANAGER_PATH', plugin_dir_path( __FILE__ ) );
-define( 'GPT_CONTENT_MANAGER_URL', trailingslashit( plugins_url( plugin_basename( __DIR__ ) ) ) );
+// Load custom autoloader
+$autoload = GCM_DIR . 'autoload.php';
 
-register_activation_hook( __FILE__, [ Activator::class, 'activate' ] );
-register_deactivation_hook( __FILE__, [ Deactivator::class, 'deactivate' ] );
-
-function instantiate_gpt_content_manager(): void {
-	$settings = new Settings();
-	new GptContentManager( $settings );
+if (is_readable($autoload)) {
+    require_once $autoload;
 }
-instantiate_gpt_content_manager();
+
+add_action('plugins_loaded', static function () {
+    // Initialize the main plugin instance
+    $plugin = SZ\GptContentManager::getInstance();
+    // Load the plugin
+    $plugin->load(); 
+});
